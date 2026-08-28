@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -39,8 +40,74 @@ import signal.YinPitchAnalyzer
 private val Ink = Color(0xFF183B3B)
 private val Teal = Color(0xFF147D76)
 private val Sand = Color(0xFFF7F4ED)
+private val Moss = Color(0xFF5B7567)
+private val WarmWhite = Color(0xFFFFFCF6)
+private val Forest = Color(0xFF0D5148)
+private val Mint = Color(0xFFDCEFE7)
+private val Clay = Color(0xFFB76B45)
+private val Charcoal = Color(0xFF263938)
+private val Muted = Color(0xFF637771)
+private val Rule = Color(0xFFD6E2DC)
+
+private val WorkshopTypography = Typography(
+    displayLarge = androidx.compose.ui.text.TextStyle(fontSize = 38.sp, lineHeight = 42.sp, fontWeight = FontWeight.Bold, letterSpacing = (-.7).sp),
+    headlineLarge = androidx.compose.ui.text.TextStyle(fontSize = 30.sp, lineHeight = 35.sp, fontWeight = FontWeight.Bold, letterSpacing = (-.3).sp),
+    headlineSmall = androidx.compose.ui.text.TextStyle(fontSize = 21.sp, lineHeight = 26.sp, fontWeight = FontWeight.Bold),
+    titleMedium = androidx.compose.ui.text.TextStyle(fontSize = 17.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold),
+    bodyLarge = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, lineHeight = 24.sp),
+    bodyMedium = androidx.compose.ui.text.TextStyle(fontSize = 14.sp, lineHeight = 20.sp),
+    labelLarge = androidx.compose.ui.text.TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Bold, letterSpacing = .5.sp)
+)
 
 private enum class Screen { Welcome, Wheels, Create, Detail, Capture, Results }
+
+@Composable
+private fun SectionLabel(text: String, modifier: Modifier = Modifier) {
+    Text(text.uppercase(), modifier = modifier, fontSize = 11.sp, letterSpacing = 1.6.sp,
+        fontWeight = FontWeight.Bold, color = Teal)
+}
+
+@Composable
+private fun StepBadge(number: String, title: String, detail: String) {
+    Row(verticalAlignment = Alignment.Top, modifier = Modifier.fillMaxWidth()) {
+        Surface(shape = CircleShape, color = Forest, modifier = Modifier.size(30.dp)) {
+            Box(contentAlignment = Alignment.Center) { Text(number, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp) }
+        }
+        Column(Modifier.padding(start = 12.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, color = Ink)
+            Text(detail, style = MaterialTheme.typography.bodyMedium, color = Muted, modifier = Modifier.padding(top = 2.dp))
+        }
+    }
+}
+
+@Composable
+private fun WorkshopCard(content: @Composable ColumnScope.() -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = WarmWhite),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)) {
+        Column(Modifier.padding(20.dp), content = content)
+    }
+}
+
+@Composable
+private fun StatusPill(text: String, positive: Boolean = true) {
+    Surface(shape = RoundedCornerShape(50), color = if (positive) Mint else Color(0xFFF7E7DE)) {
+        Row(Modifier.padding(horizontal = 11.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(7.dp).clip(CircleShape), contentAlignment = Alignment.Center) { Surface(color = if (positive) Forest else Clay) {} }
+            Text(text, color = if (positive) Forest else Color(0xFF86482F), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 7.dp))
+        }
+    }
+}
+
+@Composable
+private fun ProgressPill(current: Int, total: Int) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text("PASS PROGRESS", fontSize = 11.sp, letterSpacing = 1.3.sp, fontWeight = FontWeight.Bold, color = Muted)
+        Spacer(Modifier.weight(1f))
+        Text("$current / $total", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Forest)
+    }
+    LinearProgressIndicator(progress = { current.toFloat() / total.coerceAtLeast(1) }, modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(6.dp)), color = Teal, trackColor = Rule)
+}
 
 @Composable
 fun SpokeTuneApp() {
@@ -48,7 +115,7 @@ fun SpokeTuneApp() {
     var wheels by remember { mutableStateOf(listOf("Commuter · 700c", "Trail e-bike · 27.5\"")) }
     var selected by remember { mutableStateOf(0) }
     var spokeCount by remember { mutableStateOf(32) }
-    MaterialTheme(colorScheme = lightColorScheme(primary = Teal, onPrimary = Color.White, background = Sand, surface = Color.White, onSurface = Ink)) {
+    MaterialTheme(colorScheme = lightColorScheme(primary = Teal, onPrimary = Color.White, background = Sand, surface = WarmWhite, onSurface = Ink, surfaceVariant = Color(0xFFE8EFE9), onSurfaceVariant = Moss, secondary = Clay, outline = Rule), typography = WorkshopTypography) {
         Surface(Modifier.fillMaxSize(), color = Sand) {
             when (screen) {
                 Screen.Welcome -> WelcomeScreen { screen = Screen.Wheels }
@@ -64,11 +131,11 @@ fun SpokeTuneApp() {
 
 @Composable private fun WelcomeScreen(onContinue: () -> Unit) {
     Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.SpaceBetween) {
-        Column { Spacer(Modifier.height(28.dp)); Text("SpokeTune", fontSize = 38.sp, fontWeight = FontWeight.Bold, color = Ink); Text("A calmer way to compare spoke pitch.", fontSize = 18.sp, color = Teal); Spacer(Modifier.height(30.dp));
+        Column { Spacer(Modifier.height(28.dp)); Text("SPOKETUNE", fontSize = 14.sp, letterSpacing = 3.sp, fontWeight = FontWeight.Bold, color = Teal); Spacer(Modifier.height(10.dp)); Text("Hear the wheel.\nUnderstand the pattern.", fontSize = 34.sp, lineHeight = 39.sp, fontWeight = FontWeight.Bold, color = Ink); Text("A calmer way to compare spoke pitch.", fontSize = 18.sp, color = Moss, modifier = Modifier.padding(top = 12.dp)); Spacer(Modifier.height(30.dp));
             Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFE4F1ED)), shape = RoundedCornerShape(20.dp)) { Column(Modifier.padding(20.dp)) { Text("Relative readings, not a verdict", fontWeight = FontWeight.Bold, fontSize = 20.sp); Spacer(Modifier.height(8.dp)); Text("Spoke pitch is one signal. It does not measure absolute tension, trueness, or whether a wheel is safe to ride.") } }
-            Spacer(Modifier.height(18.dp)); Text("Before you begin", fontWeight = FontWeight.Bold, fontSize = 18.sp); Text("Stop and ask a qualified mechanic about broken or damaged spokes, rim damage, severe looseness, instability, or anything you are unsure about.", Modifier.padding(top = 8.dp)); Spacer(Modifier.height(18.dp)); Text("Microphone access is requested only when you start a capture. Audio is analyzed in memory and discarded.", color = Color(0xFF456363))
+            Spacer(Modifier.height(22.dp)); SectionLabel("The simple loop"); Spacer(Modifier.height(14.dp)); StepBadge("1", "Set up the wheel", "Name it and choose its spoke count."); Spacer(Modifier.height(14.dp)); StepBadge("2", "Tap and pluck", "One spoke at a time, one clean ring."); Spacer(Modifier.height(14.dp)); StepBadge("3", "Read the pattern", "Compare each side with itself."); Spacer(Modifier.height(22.dp)); Text("Before you begin", fontWeight = FontWeight.Bold, fontSize = 18.sp); Text("Stop and ask a qualified mechanic about broken or damaged spokes, rim damage, severe looseness, instability, or anything you are unsure about.", Modifier.padding(top = 8.dp)); Spacer(Modifier.height(18.dp)); Text("Microphone access is requested only when you start a capture. Audio is analyzed in memory and discarded.", color = Muted)
         }
-        Button(onClick = onContinue, Modifier.fillMaxWidth().height(54.dp), shape = RoundedCornerShape(16.dp)) { Text("Set up a wheel") }
+        Button(onClick = onContinue, Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(16.dp)) { Text("Set up a wheel", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
     }
 }
 
@@ -78,9 +145,9 @@ fun SpokeTuneApp() {
 
 @Composable private fun CreateWheelScreen(count: Int, setCount: (Int) -> Unit, onSave: () -> Unit, onBack: () -> Unit) { Scaffold(topBar = { TopBar("Create wheel", onBack) }) { p -> Column(Modifier.padding(p).padding(20.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) { var name by remember { mutableStateOf("") }; OutlinedTextField(name, { name = it }, Modifier.fillMaxWidth(), label = { Text("Wheel name") }, supportingText = { Text("A name helps you recognize this wheel later.") }, singleLine = true); Text("Spoke count", fontWeight = FontWeight.Bold); Text("Choose an even count from 12 to 48.", color = Color(0xFF456363)); Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { listOf(24, 28, 32, 36).forEach { n -> FilterChip(selected = count == n, onClick = { setCount(n) }, label = { Text(n.toString()) }) } }; OutlinedTextField("", {}, Modifier.fillMaxWidth(), label = { Text("Notes (optional)") }, minLines = 3); Text("Geometry notes do not convert pitch into tension.", color = Color(0xFF456363), fontSize = 13.sp); Spacer(Modifier.weight(1f)); Button(onSave, Modifier.fillMaxWidth().height(52.dp), enabled = name.isNotBlank()) { Text("Save wheel") } } } }
 
-@Composable private fun WheelDetailScreen(name: String, count: Int, onStart: () -> Unit, onBack: () -> Unit) { Scaffold(topBar = { TopBar(name, onBack) }) { p -> Column(Modifier.padding(p).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) { WheelDiagram(count, emptySet(), emptySet()); Text("$count spokes · local only", color = Color(0xFF456363)); Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(16.dp)) { Column(Modifier.padding(18.dp)) { Text("No sessions yet", fontWeight = FontWeight.Bold); Text("Start a pass to build a same-side comparison. Previous accepted readings stay auditable.", Modifier.padding(top = 6.dp)) } }; Button(onStart, Modifier.fillMaxWidth().height(52.dp)) { Text("Start a new pass") } } } }
+@Composable private fun WheelDetailScreen(name: String, count: Int, onStart: () -> Unit, onBack: () -> Unit) { Scaffold(topBar = { TopBar(name, onBack) }) { p -> Column(Modifier.padding(p).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) { WheelDiagram(count, emptySet(), emptySet()); Row(verticalAlignment = Alignment.CenterVertically) { StatusPill("READY TO MEASURE"); Spacer(Modifier.width(10.dp)); Text("$count spokes · local only", color = Muted, fontSize = 13.sp) }; WorkshopCard { Text("No sessions yet", style = MaterialTheme.typography.headlineSmall); Text("Start a pass to build a same-side comparison. Previous accepted readings stay auditable.", color = Muted, modifier = Modifier.padding(top = 7.dp)); HorizontalDivider(color = Rule, modifier = Modifier.padding(vertical = 16.dp)); Text("Tip", fontWeight = FontWeight.Bold, color = Forest); Text("A consistent pluck and a quiet workspace make patterns easier to trust.", color = Muted, modifier = Modifier.padding(top = 4.dp)) }; Button(onStart, Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(16.dp)) { Text("Start a new pass", fontWeight = FontWeight.Bold, fontSize = 16.sp) } } } }
 
-@Composable private fun WheelDiagram(count: Int, accepted: Set<Int>, current: Set<Int>) { Canvas(Modifier.fillMaxWidth().height(260.dp).semantics { contentDescription = "Wheel map with $count numbered spokes. Use the spoke list for accessible navigation." }) { val c = center; val r = size.minDimension * .34f; drawCircle(Color(0xFFD8E7E2), r); drawCircle(Color.White, r * .38f); repeat(count) { i -> val a = (i * 360f / count - 90f) * kotlin.math.PI.toFloat() / 180f; val x = c.x + kotlin.math.cos(a) * r; val y = c.y + kotlin.math.sin(a) * r; drawLine(Color(0xFF8DBAB1), c, androidx.compose.ui.geometry.Offset(x, y), 2f, StrokeCap.Round); drawCircle(if (current.contains(i + 1)) Teal else if (accepted.contains(i + 1)) Color(0xFF5B9D78) else Color(0xFFB8CBC5), 7f, androidx.compose.ui.geometry.Offset(x, y)) } } }
+@Composable private fun WheelDiagram(count: Int, accepted: Set<Int>, current: Set<Int>) { Canvas(Modifier.fillMaxWidth().height(260.dp).semantics { contentDescription = "Wheel map with $count numbered spokes. Use the spoke list for accessible navigation." }) { val c = center; val r = size.minDimension * .34f; drawCircle(Color(0xFFE2ECE6), r + 11f); drawCircle(Color(0xFFFDFBF5), r, style = Stroke(7f)); drawCircle(Color(0xFFEAF1EB), r * .34f); drawCircle(Color(0xFFB4C9BD), r * .12f); repeat(count) { i -> val a = (i * 360f / count - 90f) * kotlin.math.PI.toFloat() / 180f; val x = c.x + kotlin.math.cos(a) * r; val y = c.y + kotlin.math.sin(a) * r; val point = androidx.compose.ui.geometry.Offset(x, y); drawLine(if (current.contains(i + 1)) Teal else Color(0xFF9BB7AA), c, point, if (current.contains(i + 1)) 4f else 2f, StrokeCap.Round); drawCircle(if (current.contains(i + 1)) Teal else if (accepted.contains(i + 1)) Color(0xFF5B9D78) else Color(0xFFB8CBC5), if (current.contains(i + 1)) 9f else 6f, point) } } }
 
 @Composable private fun CaptureScreen(count: Int, onDone: () -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
