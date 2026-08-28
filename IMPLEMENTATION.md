@@ -677,13 +677,21 @@ it. Promote it into the appropriate phase with a stable ID during triage.
 
 # Current project state
 
-- Planning baseline created; no Android application has been bootstrapped.
-- Next recommended parallel batch: P0-001, P0-004, P0-010, and P0-020 through
-  P0-028 with explicit owners.
-- First sequential critical path: P0-020/P0-021/P0-023 -> P1-001 -> P1-002 ->
-  P1-005 -> P1-020 -> walking skeleton.
-- Highest technical risk: real-world fundamental-frequency reliability across
-  phones, spokes, crossings, damping, and ambient noise—not microphone access.
+- Walking alpha implemented in `f79c545`: Gradle/Compose app shell, onboarding,
+  wheel/session UI, just-in-time microphone permission, bounded ephemeral capture,
+  YIN/CMNDF analyzer, pure domain/statistics module, strict portable-data model,
+  unit tests, and a buildable debug APK.
+- Verified on 2026-08-28 with `testDebugUnitTest assembleDebug` plus passing
+  `:core:domain:test`, `:signal:test`, and `:core:data:test`. No Android device was
+  connected, so installation, real microphone behavior, and visual/device QA are
+  not yet verified.
+- The results surface is still demonstration data; accepted readings are not yet
+  persisted into a complete multi-spoke session. Room persistence, real results
+  wiring, import/export UI, lifecycle instrumentation, and accessibility QA remain.
+- External P0 research and all qualified wheel-builder, legal, field-corpus, and
+  device-matrix gates remain open. This artifact is not a release candidate.
+- Highest technical risk remains real-world fundamental-frequency reliability
+  across phones, spokes, crossings, damping, and ambient noise—not microphone access.
 
 # Research starting points
 
