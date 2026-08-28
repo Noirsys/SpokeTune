@@ -134,12 +134,28 @@ fun SpokeTuneApp() {
 }
 
 @Composable private fun WelcomeScreen(onContinue: () -> Unit) {
-    Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.SpaceBetween) {
-        Column { Spacer(Modifier.height(28.dp)); Text("SPOKETUNE", fontSize = 14.sp, letterSpacing = 3.sp, fontWeight = FontWeight.Bold, color = Teal); Spacer(Modifier.height(10.dp)); Text("Hear the wheel.\nUnderstand the pattern.", fontSize = 34.sp, lineHeight = 39.sp, fontWeight = FontWeight.Bold, color = Ink); Text("A calmer way to compare spoke pitch.", fontSize = 18.sp, color = Moss, modifier = Modifier.padding(top = 12.dp)); Spacer(Modifier.height(30.dp));
-            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFE4F1ED)), shape = RoundedCornerShape(20.dp)) { Column(Modifier.padding(20.dp)) { Text("Relative readings, not a verdict", fontWeight = FontWeight.Bold, fontSize = 20.sp); Spacer(Modifier.height(8.dp)); Text("Spoke pitch is one signal. It does not measure absolute tension, trueness, or whether a wheel is safe to ride.") } }
-            Spacer(Modifier.height(22.dp)); SectionLabel("The simple loop"); Spacer(Modifier.height(14.dp)); StepBadge("1", "Set up the wheel", "Name it and choose its spoke count."); Spacer(Modifier.height(14.dp)); StepBadge("2", "Tap and pluck", "One spoke at a time, one clean ring."); Spacer(Modifier.height(14.dp)); StepBadge("3", "Read the pattern", "Compare each side with itself."); Spacer(Modifier.height(22.dp)); Text("Before you begin", fontWeight = FontWeight.Bold, fontSize = 18.sp); Text("Stop and ask a qualified mechanic about broken or damaged spokes, rim damage, severe looseness, instability, or anything you are unsure about.", Modifier.padding(top = 8.dp)); Spacer(Modifier.height(18.dp)); Text("Microphone access is requested only when you start a capture. Audio is analyzed in memory and discarded.", color = Muted)
+    Scaffold(
+        containerColor = Sand,
+        bottomBar = {
+            Surface(color = Sand) {
+                Button(
+                    onClick = onContinue,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp).navigationBarsPadding().height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                ) { Text("Set up a wheel", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+            }
+        },
+    ) { innerPadding ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(innerPadding),
+            contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = 28.dp, bottom = 20.dp),
+        ) {
+            item {
+                Text("SPOKETUNE", fontSize = 14.sp, letterSpacing = 3.sp, fontWeight = FontWeight.Bold, color = Teal); Spacer(Modifier.height(10.dp)); Text("Hear the wheel.\nUnderstand the pattern.", fontSize = 34.sp, lineHeight = 39.sp, fontWeight = FontWeight.Bold, color = Ink); Text("A calmer way to compare spoke pitch.", fontSize = 18.sp, color = Moss, modifier = Modifier.padding(top = 12.dp)); Spacer(Modifier.height(30.dp));
+                Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFE4F1ED)), shape = RoundedCornerShape(20.dp)) { Column(Modifier.padding(20.dp)) { Text("Relative readings, not a verdict", fontWeight = FontWeight.Bold, fontSize = 20.sp); Spacer(Modifier.height(8.dp)); Text("Spoke pitch is one signal. It does not measure absolute tension, trueness, or whether a wheel is safe to ride.") } }
+                Spacer(Modifier.height(22.dp)); SectionLabel("The simple loop"); Spacer(Modifier.height(14.dp)); StepBadge("1", "Set up the wheel", "Name it and choose its spoke count."); Spacer(Modifier.height(14.dp)); StepBadge("2", "Tap and pluck", "One spoke at a time, one clean ring."); Spacer(Modifier.height(14.dp)); StepBadge("3", "Read the pattern", "Compare each side with itself."); Spacer(Modifier.height(22.dp)); Text("Before you begin", fontWeight = FontWeight.Bold, fontSize = 18.sp); Text("Stop and ask a qualified mechanic about broken or damaged spokes, rim damage, severe looseness, instability, or anything you are unsure about.", Modifier.padding(top = 8.dp)); Spacer(Modifier.height(18.dp)); Text("Microphone access is requested only when you start a capture. Audio is analyzed in memory and discarded.", color = Muted)
+            }
         }
-        Button(onClick = onContinue, Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(16.dp)) { Text("Set up a wheel", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
     }
 }
 
