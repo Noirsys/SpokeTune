@@ -2,6 +2,7 @@ package signal
 
 import kotlin.math.PI
 import kotlin.math.sin
+import kotlin.math.exp
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -37,6 +38,32 @@ class PitchAnalyzerTest {
         }
         val result = analyzer.analyze(noise, 48_000)
         assertTrue(result is PitchResult.Rejected)
+    }
+
+    @Test fun findsPitchInImpactAndDecayingRing() {
+        val sampleRate = 48_000
+        val samples = FloatArray((sampleRate * 1.5).toInt()) { i ->
+            val t = i.toFloat() / sampleRate
+            val ring = (0.28 * exp(-2.8 * t) * sin(2.0 * PI * 220.0 * t)).toFloat()
+            val impact = if (i < 180) (0.9f * (1f - i / 180f)) else 0f
+            ring + impact
+        }
+        val result = analyzer.analyze(samples, sampleRate)
+        assertTrue(result is PitchResult.Accepted, result.toString())
+        result as PitchResult.Accepted
+        assertTrue(kotlin.math.abs(result.frequencyHz - 220f) < 4f, result.toString())
+    }
+
+    @Test fun ignoresQuietTailAfterShortRing() {
+        val sampleRate = 48_000
+        val samples = FloatArray(sampleRate * 2) { i ->
+            val t = i.toFloat() / sampleRate
+            if (t < .35f) (0.25 * exp(-5.0 * t) * sin(2.0 * PI * 330.0 * t)).toFloat() else 0f
+        }
+        val result = analyzer.analyze(samples, sampleRate)
+        assertTrue(result is PitchResult.Accepted, result.toString())
+        result as PitchResult.Accepted
+        assertTrue(kotlin.math.abs(result.frequencyHz - 330f) < 5f, result.toString())
     }
 
     private fun sine(frequency: Float, sampleRate: Int, seconds: Float): FloatArray =

@@ -41,6 +41,43 @@ class YinPitchAnalyzer(private val config: YinConfig = YinConfig()) : PitchAnaly
         val maxLag = kotlin.math.ceil(sampleRateHz / config.minFrequencyHz).toInt()
         if (samples.size < maxLag * 2 + 2) return PitchResult.Rejected(RejectionReason.TOO_SHORT)
 
+        // A phone capture includes the finger impact and a long quiet tail.  Running
+        // YIN over all of it dilutes the periodic part and makes the attack dominate
+        // the difference function. Analyze short, overlapping windows and retain the
+        // strongest valid ring window instead.
+        val windowSize = 4096.coerceAtLeast(maxLag * 2 + 2)
+        if (samples.size > windowSize) {
+            // 50% overlap gives several chances to land after the impact while
+            // keeping the quadratic YIN work bounded on a phone.
+            val hop = windowSize / 2
+            var best: PitchResult.Accepted? = null
+            var bestScore = -1f
+            var bestRejection: PitchResult = PitchResult.Rejected(RejectionReason.LOW_CONFIDENCE)
+            var start = 0
+            while (start < samples.size) {
+                val end = (start + windowSize).coerceAtMost(samples.size)
+                if (end - start >= maxLag * 2 + 2) {
+                    val candidate = analyzeWindow(samples.copyOfRange(start, end), sampleRateHz)
+                    if (candidate is PitchResult.Accepted) {
+                        // Confidence is primary; RMS breaks ties in favour of a clear
+                        // ring without allowing the impact to win on amplitude alone.
+                        val score = candidate.confidence + 0.08f * kotlin.math.ln(1f + candidate.rms * 100f)
+                        if (score > bestScore) { best = candidate; bestScore = score }
+                    } else bestRejection = candidate
+                }
+                if (end == samples.size) break
+                start += hop
+            }
+            return best ?: bestRejection
+        }
+        return analyzeWindow(samples, sampleRateHz)
+    }
+
+    private fun analyzeWindow(samples: FloatArray, sampleRateHz: Int): PitchResult {
+        val minLag = kotlin.math.floor(sampleRateHz / config.maxFrequencyHz).toInt().coerceAtLeast(2)
+        val maxLag = kotlin.math.ceil(sampleRateHz / config.minFrequencyHz).toInt()
+        if (samples.size < maxLag * 2 + 2) return PitchResult.Rejected(RejectionReason.TOO_SHORT)
+
         val mean = samples.average().toFloat()
         val centered = FloatArray(samples.size) { samples[it] - mean }
         val rms = kotlin.math.sqrt(centered.map { it * it }.average()).toFloat()

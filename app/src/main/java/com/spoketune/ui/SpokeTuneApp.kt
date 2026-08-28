@@ -60,6 +60,7 @@ private val WorkshopTypography = Typography(
 )
 
 private enum class Screen { Welcome, Wheels, Create, Detail, Capture, Results }
+private data class UiWheel(val name: String, val sizeLabel: String, val spokeCount: Int)
 
 @Composable
 private fun SectionLabel(text: String, modifier: Modifier = Modifier) {
@@ -112,7 +113,10 @@ private fun ProgressPill(current: Int, total: Int) {
 @Composable
 fun SpokeTuneApp() {
     var screen by remember { mutableStateOf(Screen.Welcome) }
-    var wheels by remember { mutableStateOf(listOf("Commuter · 700c", "Trail e-bike · 27.5\"")) }
+    var wheels by remember { mutableStateOf(listOf(
+        UiWheel("Commuter", "700c", 32),
+        UiWheel("Trail e-bike", "27-inch fat tire", 36),
+    )) }
     var selected by remember { mutableStateOf(0) }
     var spokeCount by remember { mutableStateOf(32) }
     MaterialTheme(colorScheme = lightColorScheme(primary = Teal, onPrimary = Color.White, background = Sand, surface = WarmWhite, onSurface = Ink, surfaceVariant = Color(0xFFE8EFE9), onSurfaceVariant = Moss, secondary = Clay, outline = Rule), typography = WorkshopTypography) {
@@ -120,10 +124,10 @@ fun SpokeTuneApp() {
             when (screen) {
                 Screen.Welcome -> WelcomeScreen { screen = Screen.Wheels }
                 Screen.Wheels -> WheelListScreen(wheels, { screen = Screen.Create }, { selected = it; screen = Screen.Detail })
-                Screen.Create -> CreateWheelScreen(spokeCount, { spokeCount = it }, { wheels = wheels + "New wheel · $spokeCount spokes"; selected = wheels.size; screen = Screen.Detail }, { screen = Screen.Wheels })
-                Screen.Detail -> WheelDetailScreen(wheels.getOrElse(selected) { "Wheel" }, spokeCount, { screen = Screen.Capture }, { screen = Screen.Wheels })
-                Screen.Capture -> CaptureScreen(spokeCount, { screen = Screen.Results }, { screen = Screen.Detail })
-                Screen.Results -> ResultsScreen(spokeCount) { screen = Screen.Detail }
+                Screen.Create -> CreateWheelScreen(spokeCount, { spokeCount = it }, { name, count -> wheels = wheels + UiWheel(name, "Custom wheel", count); selected = wheels.size; screen = Screen.Detail }, { screen = Screen.Wheels })
+                Screen.Detail -> wheels.getOrNull(selected)?.let { wheel -> WheelDetailScreen("${wheel.name} · ${wheel.sizeLabel}", wheel.spokeCount, { screen = Screen.Capture }, { screen = Screen.Wheels }) }
+                Screen.Capture -> CaptureScreen(wheels.getOrNull(selected)?.spokeCount ?: spokeCount, { screen = Screen.Results }, { screen = Screen.Detail })
+                Screen.Results -> ResultsScreen(wheels.getOrNull(selected)?.spokeCount ?: spokeCount) { screen = Screen.Detail }
             }
         }
     }
@@ -141,9 +145,9 @@ fun SpokeTuneApp() {
 
 @Composable private fun TopBar(title: String, onBack: (() -> Unit)? = null) { Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) { if (onBack != null) IconButton(onBack) { Text("‹", fontSize = 32.sp, color = Ink) }; Text(title, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Ink); Spacer(Modifier.weight(1f)); Text("i", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Teal, modifier = Modifier.semantics { contentDescription = "Help" }) } }
 
-@Composable private fun WheelListScreen(wheels: List<String>, onAdd: () -> Unit, onSelect: (Int) -> Unit) { Scaffold(topBar = { TopBar("Your wheels") }, floatingActionButton = { FloatingActionButton(onAdd, containerColor = Teal, contentColor = Color.White) { Text("+", fontSize = 28.sp) } }) { p -> LazyColumn(Modifier.padding(p).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { item { Text("Keep each wheel’s readings separate. Compare spokes only within the same side.", color = Color(0xFF456363), modifier = Modifier.padding(bottom = 8.dp)) }; items(wheels.indices.toList()) { i -> Card(onClick = { onSelect(i) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) { Column(Modifier.padding(18.dp)) { Text(wheels[i], fontSize = 19.sp, fontWeight = FontWeight.SemiBold); Text("No completed sessions yet", color = Color(0xFF456363), modifier = Modifier.padding(top = 6.dp)); Text("Open wheel", color = Teal, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp)) } } } } } }
+@Composable private fun WheelListScreen(wheels: List<UiWheel>, onAdd: () -> Unit, onSelect: (Int) -> Unit) { Scaffold(topBar = { TopBar("Your wheels") }, floatingActionButton = { FloatingActionButton(onAdd, containerColor = Teal, contentColor = Color.White) { Text("+", fontSize = 28.sp) } }) { p -> LazyColumn(Modifier.padding(p).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { item { Text("Keep each wheel’s readings separate. Compare spokes only within the same side.", color = Color(0xFF456363), modifier = Modifier.padding(bottom = 8.dp)) }; items(wheels.indices.toList()) { i -> Card(onClick = { onSelect(i) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) { Column(Modifier.padding(18.dp)) { Text("${wheels[i].name} · ${wheels[i].sizeLabel}", fontSize = 19.sp, fontWeight = FontWeight.SemiBold); Text("${wheels[i].spokeCount} spokes · alternating hub sides", color = Color(0xFF456363), modifier = Modifier.padding(top = 6.dp)); Text("Open wheel", color = Teal, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp)) } } } } } }
 
-@Composable private fun CreateWheelScreen(count: Int, setCount: (Int) -> Unit, onSave: () -> Unit, onBack: () -> Unit) { Scaffold(topBar = { TopBar("Create wheel", onBack) }) { p -> Column(Modifier.padding(p).padding(20.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) { var name by remember { mutableStateOf("") }; OutlinedTextField(name, { name = it }, Modifier.fillMaxWidth(), label = { Text("Wheel name") }, supportingText = { Text("A name helps you recognize this wheel later.") }, singleLine = true); Text("Spoke count", fontWeight = FontWeight.Bold); Text("Choose an even count from 12 to 48.", color = Color(0xFF456363)); Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { listOf(24, 28, 32, 36).forEach { n -> FilterChip(selected = count == n, onClick = { setCount(n) }, label = { Text(n.toString()) }) } }; OutlinedTextField("", {}, Modifier.fillMaxWidth(), label = { Text("Notes (optional)") }, minLines = 3); Text("Geometry notes do not convert pitch into tension.", color = Color(0xFF456363), fontSize = 13.sp); Spacer(Modifier.weight(1f)); Button(onSave, Modifier.fillMaxWidth().height(52.dp), enabled = name.isNotBlank()) { Text("Save wheel") } } } }
+@Composable private fun CreateWheelScreen(count: Int, setCount: (Int) -> Unit, onSave: (String, Int) -> Unit, onBack: () -> Unit) { Scaffold(topBar = { TopBar("Create wheel", onBack) }) { p -> Column(Modifier.padding(p).padding(20.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) { var name by remember { mutableStateOf("") }; var notes by remember { mutableStateOf("") }; OutlinedTextField(name, { name = it }, Modifier.fillMaxWidth(), label = { Text("Wheel name") }, supportingText = { Text("A name helps you recognize this wheel later.") }, singleLine = true); Text("Spoke count", fontWeight = FontWeight.Bold); Text("Choose the count printed by the wheel or count each spoke once.", color = Color(0xFF456363)); Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { listOf(24, 28, 32, 36).forEach { n -> FilterChip(selected = count == n, onClick = { setCount(n) }, label = { Text(n.toString()) }) } }; OutlinedTextField(notes, { notes = it }, Modifier.fillMaxWidth(), label = { Text("Notes (optional)") }, minLines = 3); Text("Geometry notes do not convert pitch into tension.", color = Color(0xFF456363), fontSize = 13.sp); Spacer(Modifier.weight(1f)); Button({ onSave(name.trim(), count) }, Modifier.fillMaxWidth().height(52.dp), enabled = name.isNotBlank()) { Text("Save wheel") } } } }
 
 @Composable private fun WheelDetailScreen(name: String, count: Int, onStart: () -> Unit, onBack: () -> Unit) { Scaffold(topBar = { TopBar(name, onBack) }) { p -> Column(Modifier.padding(p).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) { WheelDiagram(count, emptySet(), emptySet()); Row(verticalAlignment = Alignment.CenterVertically) { StatusPill("READY TO MEASURE"); Spacer(Modifier.width(10.dp)); Text("$count spokes · local only", color = Muted, fontSize = 13.sp) }; WorkshopCard { Text("No sessions yet", style = MaterialTheme.typography.headlineSmall); Text("Start a pass to build a same-side comparison. Previous accepted readings stay auditable.", color = Muted, modifier = Modifier.padding(top = 7.dp)); HorizontalDivider(color = Rule, modifier = Modifier.padding(vertical = 16.dp)); Text("Tip", fontWeight = FontWeight.Bold, color = Forest); Text("A consistent pluck and a quiet workspace make patterns easier to trust.", color = Muted, modifier = Modifier.padding(top = 4.dp)) }; Button(onStart, Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(16.dp)) { Text("Start a new pass", fontWeight = FontWeight.Bold, fontSize = 16.sp) } } } }
 
