@@ -36,6 +36,10 @@ import platform.audio.AudioCapture
 import platform.audio.AudioCaptureResult
 import signal.PitchResult
 import signal.YinPitchAnalyzer
+import com.spoketune.app.session.CaptureSession
+import com.spoketune.core.domain.WheelProfile
+import com.spoketune.core.domain.Measurement
+import com.spoketune.app.BuildConfig
 
 private val Ink = Color(0xFF183B3B)
 private val Teal = Color(0xFF147D76)
@@ -119,15 +123,16 @@ fun SpokeTuneApp() {
     )) }
     var selected by remember { mutableStateOf(0) }
     var spokeCount by remember { mutableStateOf(32) }
+    var session by remember { mutableStateOf<CaptureSession?>(null) }
     MaterialTheme(colorScheme = lightColorScheme(primary = Teal, onPrimary = Color.White, background = Sand, surface = WarmWhite, onSurface = Ink, surfaceVariant = Color(0xFFE8EFE9), onSurfaceVariant = Moss, secondary = Clay, outline = Rule), typography = WorkshopTypography) {
         Surface(Modifier.fillMaxSize(), color = Sand) {
             when (screen) {
                 Screen.Welcome -> WelcomeScreen { screen = Screen.Wheels }
                 Screen.Wheels -> WheelListScreen(wheels, { screen = Screen.Create }, { selected = it; screen = Screen.Detail })
                 Screen.Create -> CreateWheelScreen(spokeCount, { spokeCount = it }, { name, count -> wheels = wheels + UiWheel(name, "Custom wheel", count); selected = wheels.size; screen = Screen.Detail }, { screen = Screen.Wheels })
-                Screen.Detail -> wheels.getOrNull(selected)?.let { wheel -> WheelDetailScreen("${wheel.name} · ${wheel.sizeLabel}", wheel.spokeCount, { screen = Screen.Capture }, { screen = Screen.Wheels }) }
-                Screen.Capture -> CaptureScreen(wheels.getOrNull(selected)?.spokeCount ?: spokeCount, { screen = Screen.Results }, { screen = Screen.Detail })
-                Screen.Results -> ResultsScreen(wheels.getOrNull(selected)?.spokeCount ?: spokeCount) { screen = Screen.Detail }
+                Screen.Detail -> wheels.getOrNull(selected)?.let { wheel -> WheelDetailScreen("${wheel.name} · ${wheel.sizeLabel}", wheel.spokeCount, { session = CaptureSession(WheelProfile(name = wheel.name, spokeCount = wheel.spokeCount)); screen = Screen.Capture }, { screen = Screen.Wheels }) }
+                Screen.Capture -> session?.let { CaptureScreen(it, { screen = Screen.Results }, { screen = Screen.Detail }) }
+                Screen.Results -> session?.let { ResultsScreen(it) { screen = Screen.Detail } }
             }
         }
     }
@@ -169,10 +174,11 @@ fun SpokeTuneApp() {
 
 @Composable private fun WheelDiagram(count: Int, accepted: Set<Int>, current: Set<Int>) { Canvas(Modifier.fillMaxWidth().height(260.dp).semantics { contentDescription = "Wheel map with $count numbered spokes. Use the spoke list for accessible navigation." }) { val c = center; val r = size.minDimension * .34f; drawCircle(Color(0xFFE2ECE6), r + 11f); drawCircle(Color(0xFFFDFBF5), r, style = Stroke(7f)); drawCircle(Color(0xFFEAF1EB), r * .34f); drawCircle(Color(0xFFB4C9BD), r * .12f); repeat(count) { i -> val a = (i * 360f / count - 90f) * kotlin.math.PI.toFloat() / 180f; val x = c.x + kotlin.math.cos(a) * r; val y = c.y + kotlin.math.sin(a) * r; val point = androidx.compose.ui.geometry.Offset(x, y); drawLine(if (current.contains(i + 1)) Teal else Color(0xFF9BB7AA), c, point, if (current.contains(i + 1)) 4f else 2f, StrokeCap.Round); drawCircle(if (current.contains(i + 1)) Teal else if (accepted.contains(i + 1)) Color(0xFF5B9D78) else Color(0xFFB8CBC5), if (current.contains(i + 1)) 9f else 6f, point) } } }
 
-@Composable private fun CaptureScreen(count: Int, onDone: () -> Unit, onBack: () -> Unit) {
+@Composable private fun CaptureScreen(session: CaptureSession, onDone: () -> Unit, onBack: () -> Unit) {
+    val count = session.profile.spokeCount
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var spoke by remember { mutableStateOf(1) }
+    var spoke by remember { mutableStateOf(session.currentSpoke) }
     var status by remember { mutableStateOf("Tap capture, then pluck one spoke") }
     var busy by remember { mutableStateOf(false) }
     var proposal by remember { mutableStateOf<PitchResult.Accepted?>(null) }
@@ -210,6 +216,28 @@ fun SpokeTuneApp() {
         else permission.launch(Manifest.permission.RECORD_AUDIO)
     }
 
+    fun injectLabPluck() {
+        busy = true
+        proposal = null
+        status = "Analyzing repeatable lab pluck…"
+        scope.launch {
+            val sampleRate = 44_100
+            val pcm = FloatArray(sampleRate) { index ->
+                val seconds = index.toDouble() / sampleRate
+                val strike = if (index < 70) (1.0 - index / 70.0) * 0.16 else 0.0
+                val ring = kotlin.math.sin(2.0 * kotlin.math.PI * 320.0 * seconds) *
+                    kotlin.math.exp(-seconds * 4.2) * 0.72
+                (strike + ring).toFloat()
+            }
+            when (val pitch = withContext(Dispatchers.Default) { YinPitchAnalyzer().analyze(pcm, sampleRate) }) {
+                is PitchResult.Accepted -> { proposal = pitch; status = "Repeatable lab reading ready for review" }
+                is PitchResult.Rejected -> status = "Lab fixture was rejected: ${pitch.reason.name.lowercase()}"
+            }
+            pcm.fill(0f)
+            busy = false
+        }
+    }
+
     Scaffold(topBar = { TopBar("Capture pass", onBack) }) { p ->
         Column(Modifier.padding(p).padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text("Spoke $spoke of $count", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Ink)
@@ -219,6 +247,9 @@ fun SpokeTuneApp() {
             if (proposal == null) {
                 Button(onClick = ::requestOrCapture, enabled = !busy, modifier = Modifier.size(140.dp), shape = CircleShape) {
                     if (busy) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(32.dp)) else Text("Capture")
+                }
+                if (BuildConfig.DEBUG && !busy) {
+                    TextButton(onClick = ::injectLabPluck) { Text("Lab: inject test pluck") }
                 }
             } else {
                 Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFE4F1ED)), shape = RoundedCornerShape(18.dp)) {
@@ -230,16 +261,50 @@ fun SpokeTuneApp() {
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedButton(onClick = ::requestOrCapture) { Text("Retry") }
-                    Button(onClick = onDone) { Text("Accept reading") }
+                    Button(onClick = { session.accept(proposal!!.frequencyHz.toDouble(), proposal!!.confidence.toDouble()); spoke = session.currentSpoke; proposal = null; if (session.measurements().size + session.skippedSpokes().size >= count) onDone() }) { Text("Accept reading") }
                 }
             }
             Text("Microphone is used only during this bounded capture. No recording is saved.", color = Color(0xFF456363), fontSize = 13.sp)
-            TextButton(enabled = !busy, onClick = { proposal = null; spoke = if (spoke == count) 1 else spoke + 1; status = "Spoke skipped. Tap capture when ready." }) { Text("Skip this spoke") }
+            TextButton(enabled = !busy, onClick = { proposal = null; session.skip(); spoke = session.currentSpoke; status = "Spoke skipped. Tap capture when ready." }) { Text("Skip this spoke") }
         }
     }
 }
 
-@Composable private fun ResultsScreen(count: Int, onBack: () -> Unit) { Scaffold(topBar = { TopBar("Pass results", onBack) }) { p -> LazyColumn(Modifier.padding(p).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) { item { Text("Provisional comparison", fontSize = 28.sp, fontWeight = FontWeight.Bold); Text("$count spokes · 12 accepted · 2 skipped", color = Color(0xFF456363)) }; item { Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) { StatCard("Right side", "412 Hz", "median · 8 samples"); StatCard("Left side", "388 Hz", "median · 4 samples") } }; item { Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFE4F1ED)), shape = RoundedCornerShape(16.dp)) { Column(Modifier.padding(18.dp)) { Text("What this means", fontWeight = FontWeight.Bold); Text("A spoke can be higher or lower in frequency than its same-side group. That is a cue to inspect—not a tension or safety diagnosis.", Modifier.padding(top = 7.dp)) } } }; item { Text("Spoke readings", fontSize = 20.sp, fontWeight = FontWeight.Bold) }; items((1..8).toList()) { n -> ListItem(headlineContent = { Text("Spoke $n") }, supportingContent = { Text("${390 + n * 6} Hz · accepted · right side") }, trailingContent = { AssistChip(onClick = {}, label = { Text(if (n == 8) "Higher" else "Within") }) }) } } } }
+@Composable
+private fun ResultsScreen(session: CaptureSession, onBack: () -> Unit) {
+    val count = session.profile.spokeCount
+    val readings = session.measurements()
+    fun median(values: List<Double>): Double? {
+        val sorted = values.sorted()
+        if (sorted.isEmpty()) return null
+        val middle = sorted.size / 2
+        return if (sorted.size % 2 == 1) sorted[middle] else (sorted[middle - 1] + sorted[middle]) / 2.0
+    }
+    val left = readings.filter { session.profile.spoke(it.spokeNumber).side.name == "LEFT" }
+    val right = readings.filter { session.profile.spoke(it.spokeNumber).side.name == "RIGHT" }
+    fun medianLabel(values: List<Measurement>) = median(values.map { it.frequencyHz })?.let { "%.1f Hz".format(it) } ?: "—"
+    Scaffold(topBar = { TopBar("Pass results", onBack) }) { padding ->
+        LazyColumn(Modifier.padding(padding).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            item {
+                Text("Provisional comparison", fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                Text("$count spokes · ${readings.size} accepted · ${session.skippedSpokes().size} skipped", color = Muted)
+            }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    StatCard("Right side", medianLabel(right), "median · ${right.size} samples")
+                    StatCard("Left side", medianLabel(left), "median · ${left.size} samples")
+                }
+            }
+            item { Text("Spoke readings", fontSize = 20.sp, fontWeight = FontWeight.Bold) }
+            items(readings) { measurement ->
+                ListItem(
+                    headlineContent = { Text("Spoke ${measurement.spokeNumber}") },
+                    supportingContent = { Text("%.1f Hz · accepted".format(measurement.frequencyHz)) },
+                )
+            }
+        }
+    }
+}
 
 @Composable private fun RowScope.StatCard(label: String, value: String, detail: String) { Card(Modifier.weight(1f), shape = RoundedCornerShape(16.dp)) { Column(Modifier.padding(14.dp)) { Text(label, fontWeight = FontWeight.Bold); Text(value, fontSize = 23.sp, color = Teal, fontWeight = FontWeight.Bold); Text(detail, fontSize = 12.sp, color = Color(0xFF456363)) } } }
 
